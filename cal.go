@@ -11,9 +11,10 @@ import (
 
 // Config defines options for rendering.
 type Config struct {
-	Year        int        // e.g. 2023
-	Month       time.Month // e.g. time.January
-	WeekNumbers bool       // include ISO week numbers column
+	Year         int          // e.g. 2023
+	Month        time.Month   // e.g. time.January
+	WeekNumbers  bool         // include ISO week numbers column
+	StartWeekday time.Weekday // first day of week e.g. time.Sunday, time.Monday
 }
 
 // RenderMonth returns the month calendar as a string.
@@ -35,14 +36,23 @@ func RenderMonth(cfg Config) string {
 		buf.WriteString("Wk ")
 	}
 
-	buf.WriteString("Mo Tu We Th Fr Sa Su\n")
+	// Write day headers based on start weekday
+	weekdayNames := []string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
+	for i := range 7 {
+		dayIndex := (int(cfg.StartWeekday) + i) % 7
+		buf.WriteString(weekdayNames[dayIndex])
+		if i < 6 {
+			buf.WriteString(" ")
+		}
+	}
+	buf.WriteString("\n")
 
 	firstOfMonth := time.Date(cfg.Year, cfg.Month, 1, 0, 0, 0, 0, time.UTC)
 
-	startWeekday := int(firstOfMonth.Weekday())
-	if startWeekday == 0 {
-		startWeekday = 7
-	}
+	// Calculate offset from the configured start weekday
+	firstDayOfMonth := int(firstOfMonth.Weekday())
+	startWeekdayInt := int(cfg.StartWeekday)
+	offset := (firstDayOfMonth - startWeekdayInt + 7) % 7
 
 	day := 1
 	daysInMonth := daysIn(cfg.Year, cfg.Month)
@@ -51,19 +61,21 @@ func RenderMonth(cfg Config) string {
 	for row := 0; day <= daysInMonth; row++ {
 		// Optional week number
 		if cfg.WeekNumbers {
-			weekYear, week := firstOfMonth.AddDate(0, 0, day-1).ISOWeek()
-			_ = weekYear // multi-year span edge case
+			_, week := firstOfMonth.AddDate(0, 0, day-1).ISOWeek()
 			buf.WriteString(fmt.Sprintf("%2d ", week))
 		}
 
-		for wd := 1; wd <= 7; wd++ {
-			if row == 0 && wd < startWeekday {
-				buf.WriteString("   ")
+		for wd := range 7 {
+			if row == 0 && wd < offset {
+				buf.WriteString("  ")
 			} else if day > daysInMonth {
-				buf.WriteString("   ")
+				buf.WriteString("  ")
 			} else {
-				buf.WriteString(fmt.Sprintf("%2d ", day))
+				buf.WriteString(fmt.Sprintf("%2d", day))
 				day++
+			}
+			if wd < 6 {
+				buf.WriteString(" ")
 			}
 		}
 
